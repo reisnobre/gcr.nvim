@@ -1,0 +1,2 @@
+Hello Neovim
+How well do you handle conflict?
