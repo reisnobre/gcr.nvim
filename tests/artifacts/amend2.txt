@@ -1,2 +1,18 @@
+NO CONFLICT
+
 Hello Neovim
 How well do you handle conflict?
+
+This is GCR
+Which is a plugin
+Just for you
+
+This is fine. This is conflict.
+
+Why is this file so long?
+Well, there has to be 3
+To test wrapping
+
+That's why. Honest.
+
+THE END

@@ -1,1 +1,17 @@
+NO CONFLICT
+
 Hello Neovim
+
+This is GCR
+Which is a plugin
+Just for you
+
+This is fine.
+
+Why is this file so long?
+Well, there has to be 3
+To test wrapping
+
+That's why.
+
+THE END
