@@ -2,13 +2,30 @@ local Job = require'plenary.job'
 local Path = require "plenary.path"
 local api = vim.api
 local split = vim.split
+local startswith = vim.startswith
 local buf_filename = api.nvim_buf_get_name
+local get_cursor = api.nvim_win_get_cursor
+local set_cursor = api.nvim_win_set_cursor
+local buf_get_lines = api.nvim_buf_get_lines
+
+local DEBUG = false
+
+-- Used for debug logging
+local function log() end
+if DEBUG then
+  DEBUG = {}
+  log = function(...)
+    DEBUG[#DEBUG + 1] = table.concat({ string.format(...) }, " ")
+  end
+end
+
+
+local CHECK_TIMEOUT = 500
+-- nil is a hit miss, this is an empty cache hit that can be used as check by ref
+local NIL_CACHE = {}
 
 local M = {}
-local CHECK_TIMEOUT = 500
-
-local NIL_CACHE = {}
-M.NIL_CACHE = NIL_CACHE
+M.debug = DEBUG
 
 local git_diff_check_jobs = {}
 
@@ -24,7 +41,7 @@ local function parse_git_diff_check(lines)
   for _, line in ipairs(lines) do
     local parts = split(line, ':', true)
     if #parts == 3 or parts[3] == " leftover conflict marker" then
-      table.insert(results, parts[2])
+      table.insert(results, tonumber(parts[2]))
     end
   end
   if #results == 0 then
@@ -32,6 +49,10 @@ local function parse_git_diff_check(lines)
   end
 
   return results
+end
+
+local function is_marker_begin(line)
+  return startswith(line, '<<<<<<< ')
 end
 
 local function check_for_conflicts(filename, no_sync)
@@ -81,6 +102,65 @@ TODO:
 - nvim_buf_detach() on M.reset()
 - use nvim_win_get_cursor() to get the cursor position and check if it is within conflicts
 ]]
+
+local function jump_to_conflict(backward, wrap)
+  local cur_row = get_cursor(0)[1]
+  local lines = M.conflict_lines()
+  local first = nil
+  local previous = nil
+  local last = nil
+  for _, line_nr in ipairs(lines) do
+    local line = buf_get_lines(0, line_nr - 1, line_nr, false)[1]
+    local starts_conflict = is_marker_begin(line)
+    if starts_conflict then
+      if wrap then
+        if first == nil then
+          first = line_nr
+        end
+
+        last = line_nr
+      end
+
+      if backward and line_nr < cur_row then
+        previous = line_nr
+      end
+
+      -- go to previous
+      if line_nr >= cur_row and previous ~= nil then
+        set_cursor(0, {previous, 0})
+        return
+      end
+
+      -- go to next
+      if not backward and line_nr > cur_row then
+        set_cursor(0, {line_nr, 0})
+        return
+      end
+    end
+  end
+
+  -- since we scanned all lines, we can wrap
+  if wrap and first then
+    -- wrap last to first
+    if not backward then
+      set_cursor(0, {first, 0})
+      return
+    end
+
+    -- wrap first to last
+    if backward and cur_row <= first then
+        set_cursor(0, {last, 0})
+    end
+  end
+end
+
+function M.next_conflict(wrap)
+  jump_to_conflict(false, wrap)
+end
+
+function M.prev_conflict(wrap)
+  jump_to_conflict(true, wrap)
+end
 
 function M.conflict_lines(bufnr)
   bufnr = bufnr or 0
